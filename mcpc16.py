@@ -150,14 +150,14 @@ def encode_instruction(
         a_value = np.uint64(a.value)
         a_mode = np.uint64(1)
     else:
-        a_value = np.uint64(a)
+        a_value = np.uint64(a & 0xFFFF)
         a_mode = np.uint64(0)
 
     if isinstance(b, Register):
         b_value = np.uint64(b.value)
         b_mode = np.uint64(1)
     else:
-        b_value = np.uint64(b)
+        b_value = np.uint64(b & 0xFFFF)
         b_mode = np.uint64(0)
     
     opcode = np.uint64(0)
