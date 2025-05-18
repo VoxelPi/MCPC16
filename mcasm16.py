@@ -352,7 +352,7 @@ def _parse_instruction(instruction: AssemblyInstruction) -> np.uint64:
     if instruction_parts[0] == 'jump':
         # Check general syntax.
         if n_instruction_parts != 2:
-            raise AssemblySyntaxError(source_line, "Invalid syntax for jump. Should be 'jump <register|immediate>'.")
+            raise AssemblySyntaxError(source_line, f"Invalid syntax for jump. Should be 'jump <register|immediate>' is {instruction_text}.")
 
         # Parse the jump target value.
         value = parse_value(instruction_parts[1])
@@ -366,7 +366,7 @@ def _parse_instruction(instruction: AssemblyInstruction) -> np.uint64:
     if instruction_parts[0] == 'skip':
         # Check general syntax.
         if n_instruction_parts != 2:
-            raise AssemblySyntaxError(source_line, "Invalid syntax for skip. Should be 'skip <register|immediate>'.")
+            raise AssemblySyntaxError(source_line, f"Invalid syntax for skip. Should be 'skip <register|immediate>' is {instruction_text}.")
 
         # Parse the skip value.
         value = parse_value(instruction_parts[1])
@@ -929,9 +929,9 @@ def assemble(
 
         match instruction_parts[0]:
             case "repeat":
-                instruction.text = f"jump {scope.start} {remaining_part}"
+                instruction.text = f"jump {scope.start} {remaining_part}".strip()
             case "exit":
-                instruction.text = f"jump {scope.end} {remaining_part}"
+                instruction.text = f"jump {scope.end} {remaining_part}".strip()
             case _:
                 raise AssemblyError(instruction.source, f"Invalid scope statement '{instruction_parts[0]}'")
 
