@@ -348,56 +348,6 @@ def _parse_instruction(instruction: AssemblyInstruction) -> np.uint64:
         operation = no_args_instructions[instruction_text]
         return encode_instruction(operation, condition_register, Condition.NEVER, Register.R1, Register.R1, Register.R1)
 
-    # REPEAT
-    if instruction_parts[0] == "repeat":
-        if n_instruction_parts > 2:
-            raise AssemblySyntaxError(source_line, "Invalid syntax for repeat. Should be 'repeat [@scope]'.")
-        
-        # Get the target scope.
-        scope = instruction.scope
-        if n_instruction_parts == 2:
-            # Parse target scope.
-            if not instruction_parts[1].startswith("_@"):
-                raise AssemblySyntaxError(source_line, f"Invalid syntax for repeat. Should be 'repeat @scope', is '{instruction_parts[1]}'.")
-            target_scope_name = instruction_parts[1][2:]
-
-            # Search scope with name.
-            while scope is not None:
-                if scope.name == target_scope_name:
-                    break
-                scope = scope.parent
-            else:
-                # This is only executed if the loop exited "naturally", which means the scope was not found.
-                raise AssemblySyntaxError(source_line, f"Unknown scope '{target_scope_name}'")
-
-        # Encode a instruction that jumps to the first instruction of the (implicitly) specified scope.
-        return encode_instruction(Operation.A, condition_register, condition, Register.PC, scope.start, 0)
-
-    # EXIT
-    if instruction_parts[0] == "exit":
-        if n_instruction_parts > 2:
-            raise AssemblySyntaxError(source_line, "Invalid syntax for exit. Should be 'exit [@scope]'.")
-        
-        # Get the target scope.
-        scope = instruction.scope
-        if n_instruction_parts == 2:
-            # Parse target scope.
-            if not instruction_parts[1].startswith("_@"):
-                raise AssemblySyntaxError(source_line, f"Invalid syntax for exit. Should be 'exit @scope', is '{instruction_parts[1]}'.")
-            target_scope_name = instruction_parts[1][2:]
-
-            # Search scope with name.
-            while scope is not None:
-                if scope.name == target_scope_name:
-                    break
-                scope = scope.parent
-            else:
-                # This is only executed if the loop exited "naturally", which means the scope was not found.
-                raise AssemblySyntaxError(source_line, f"Unknown scope '{target_scope_name}'")
-
-        # Encode a instruction that jumps to the first instruction after the (implicitly) specified scope.
-        return encode_instruction(Operation.A, condition_register, condition, Register.PC, scope.end, 0)
-
     # JUMP
     if instruction_parts[0] == 'jump':
         # Check general syntax.
@@ -898,15 +848,43 @@ def assemble(
     # Count instructions. The number of instruction doesn't change after this point.
     n_instructions = len(instructions)
 
+    # Transform repeat / exit statements into jumps.
+    for instruction in instructions:
+        # Check if instruction is a repeat.
+        instruction_parts = instruction.text.split(" ")
+        n_instruction_parts = len(instruction_parts)
+        if n_instruction_parts < 1 or (instruction_parts[0] not in ["repeat", "exit"]):
+            continue
+
+        i_remaining_parts = 1
+
+        # Check if label is specified
+        scope = instruction.scope
+        if n_instruction_parts > 1 and instruction_parts[1].startswith("@"):
+            target_scope_name = instruction_parts[1][1:] # Skip '@' symbol.
+            i_remaining_parts = 2
+
+            # Search scope with name.
+            while scope is not None:
+                if scope.name == target_scope_name:
+                    break
+                scope = scope.parent
+            else:
+                # This is only executed if the loop exited "naturally", which means the scope was not found.
+                raise AssemblySyntaxError(instruction.source, f"Unknown parent scope '@{target_scope_name}'")
+        
+        remaining_part = " ".join(instruction_parts[i_remaining_parts:])
+
+        match instruction_parts[0]:
+            case "repeat":
+                instruction.text = f"jump {scope.start} {remaining_part}"
+            case "exit":
+                instruction.text = f"jump {scope.end} {remaining_part}"
+            case _:
+                raise AssemblyError(instruction.source, f"Invalid scope statement '{instruction_parts[0]}'")
+
     # Apply labels and macros.
     for instruction in instructions:
-        # Hack to fix labels in repeat and exit statements, as they would otherwise be replaced in the next step.
-        # The scope can't be identified by the instruction id, therefore we must disable replacing the label here.
-        if instruction.text.startswith("repeat @"):
-            instruction.text = f"repeat _@{instruction.text[8:]}"
-        elif instruction.text.startswith("exit @"):
-            instruction.text = f"exit _@{instruction.text[6:]}"
-
         # Add whitespace to fix word replace at line start / end
         instruction.text = f" {instruction.text} "
 
