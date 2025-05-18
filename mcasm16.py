@@ -837,30 +837,6 @@ def assemble(
         # Add whitespace to fix word replace at line start / end
         instruction.text = f" {instruction.text} "
 
-        # Apply labels.
-        for label in instruction.scope.visible_labels().values():
-            instruction.text = instruction.text.replace(f" @{label.name} ", f" {label.location} ")
-            instruction.text = instruction.text.replace(f"[@{label.name}]", f"[{label.location}]")
-
-        # Check for unresolved labels.
-        if " @" in instruction.text:
-            i_label_start = instruction.text.index(" @") + 1
-            if " " in instruction.text[i_label_start:]:
-                i_label_end = instruction.text[i_label_start:].index(" ")
-                label_id = instruction.text[i_label_start:(i_label_end + i_label_start)]
-            else:
-                label_id = instruction.text[i_label_start]
-            raise AssemblyError(instruction.source, f"Unable to resolve label '{label_id}'.")
-
-        if "[@" in instruction.text:
-            i_label_start = instruction.text.index("[@") + 1
-            if " " in instruction.text[i_label_start:]:
-                i_label_end = instruction.text[i_label_start:].index(" ")
-                label_id = instruction.text[i_label_start:(i_label_end + i_label_start)]
-            else:
-                label_id = instruction.text[i_label_start]
-            raise AssemblyError(instruction.source, f"Unable to resolve label '{label_id}'.")
-
         # Apply macros.
         for macro in instruction.scope.visible_macros().values():
             instruction.text = instruction.text.replace(f" {macro.name} ", f" {macro.value} ")
@@ -884,6 +860,30 @@ def assemble(
             else:
                 macro_id = instruction.text[i_macro_start]
             raise AssemblyError(instruction.source, f"Unable to resolve macro '{macro_id}'.")
+
+        # Apply labels.
+        for label in instruction.scope.visible_labels().values():
+            instruction.text = instruction.text.replace(f" @{label.name} ", f" {label.location} ")
+            instruction.text = instruction.text.replace(f"[@{label.name}]", f"[{label.location}]")
+
+        # Check for unresolved labels.
+        if " @" in instruction.text:
+            i_label_start = instruction.text.index(" @") + 1
+            if " " in instruction.text[i_label_start:]:
+                i_label_end = instruction.text[i_label_start:].index(" ")
+                label_id = instruction.text[i_label_start:(i_label_end + i_label_start)]
+            else:
+                label_id = instruction.text[i_label_start]
+            raise AssemblyError(instruction.source, f"Unable to resolve label '{label_id}'.")
+
+        if "[@" in instruction.text:
+            i_label_start = instruction.text.index("[@") + 1
+            if " " in instruction.text[i_label_start:]:
+                i_label_end = instruction.text[i_label_start:].index(" ")
+                label_id = instruction.text[i_label_start:(i_label_end + i_label_start)]
+            else:
+                label_id = instruction.text[i_label_start]
+            raise AssemblyError(instruction.source, f"Unable to resolve label '{label_id}'.")
             
         # Remove previously added whitespace.
         instruction.text = instruction.text[1:-1]

@@ -1,15 +1,15 @@
 # Include stdlib math library.
 !include math
+!define @multiply @stdlib:math/multiply
 
 # Start of the main program
-@global:start
-{
+@global:start {
     # Input to numbers.
     R1 = read
     R2 = read
 
     # Call multiply with the two inputs.
-    call @stdlib:math/multiply
+    call @multiply
 
     # Output the product.
     write R3
