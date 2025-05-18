@@ -7,7 +7,7 @@ from mcpc16 import Register, Condition, Operation, encode_instruction, PROGRAM_M
 import argparse
 from dataclasses import dataclass
 
-START_LABEL = "start"
+START_LABEL = "global:start"
 GLOBAL_SCOPE_NAME = "__global__"
 
 ASSEMBLER_MACROS = {
@@ -719,7 +719,7 @@ def assemble(
         return AssembledProgram(np.zeros(1, dtype=np.uint64), [], [], global_scope)
     
     # Insert initialization jump.
-    src_lines.insert(0, "jump @start")
+    src_lines.insert(0, f"jump @{START_LABEL}")
 
     # Prepare the source lines.
     # This handles things like comments, whitespace simplifcation and lowercase transforamtion, 

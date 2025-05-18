@@ -2,7 +2,7 @@
 !include math
 
 # Start of the main program
-@start
+@global:start
 {
     # Input to numbers.
     R1 = read

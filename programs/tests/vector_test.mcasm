@@ -1,6 +1,6 @@
 !include vector
 
-@start
+@globaL:start
 R1 = 3
 R2 = 4
 call @stdlib:vector/zeroes
