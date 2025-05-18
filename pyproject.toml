@@ -1,0 +1,21 @@
+[project]
+name = "mcpc16"
+description = "Utilities for the 16 bit mcpc a minecraft computer"
+version = "0.1.0"
+
+requires-python = ">=3.12"
+
+readme = "readme.md"
+license = "MIT"
+
+[tool.ruff]
+# Set the maximum line length to 79.
+line-length = 240
+
+[tool.ruff.lint]
+# Add the `line-too-long` rule to the enforced rule set. By default, Ruff omits rules that
+# overlap with the use of a formatter, like Black, but we can override this behavior by
+# explicitly adding the rule.
+extend-select = ["E501"]
+
+ignore = ["F841"]

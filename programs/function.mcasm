@@ -1,0 +1,10 @@
+R1 = 15
+call @output_test
+break
+write 0
+jump 0
+
+# Contract: Output in R1
+@output_test
+write R1
+return

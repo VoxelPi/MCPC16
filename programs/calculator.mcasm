@@ -1,0 +1,146 @@
+# R3: Result
+# R4: Argument A
+# R5: Argument B
+# R6: Stack pointer
+
+!define STACK_POINTER R6
+!define ARGUMENT_A R4
+!define ARGUMENT_B R5
+!define RESULT R3
+
+# Reset the calculator.
+@reset
+STACK_POINTER = 0 # Reset stack pointer to 0
+write 0
+
+# Read input
+@read_input
+R1 = read
+C1 = R1 bit get 7
+# C1 = R1 and 0x8000
+
+jump @store_number if C1 = 0
+
+# Pop the last two number of the stack, perform the calculation and push
+# The result on the stack.
+@perform_calculation
+    # Pop the top value and put in R5.
+    STACK_POINTER = dec STACK_POINTER
+    R5 = [STACK_POINTER]
+
+    # Pop the top value and put in R4.
+    STACK_POINTER = dec STACK_POINTER
+    R4 = [STACK_POINTER]
+
+    # Check stack-underflow. If this happens, reset.
+    C1 = STACK_POINTER
+    jump @reset if C1 < 0
+
+    # Clear bit 7 of the input.
+    R1 = R1 bit clear 15
+    # R1 = R1 and 0x7FFF
+    R1 = inc R1
+
+    # Goto operation
+    skip R1
+    jump @reset
+    jump @op_add
+    jump @op_sub
+    jump @op_mul
+    jump @op_div
+    jump @op_and
+    jump @op_nand
+    jump @op_or
+    jump @op_nor
+    jump @op_xor
+    jump @op_xnor
+    jump @op_shift_left
+    jump @op_shift_right
+    jump @op_rotate_left
+    jump @op_rotate_right
+
+    # Addition, calculates a + b and pushes the result on the stack.
+    @op_add
+        R3 = R4 + R5
+        jump @store_result
+
+    # Subtraction, calculates a - b and pushes the result on the stack.
+    @op_sub
+        R3 = R4 - R5
+        jump @store_result
+
+    # Multiplication, calculates a * b and pushes the result on the stack.
+    @op_mul
+        R3 = R4 * R5
+        jump @store_result
+
+    # Division, calculates a / b and pushes the result on the stack.
+    @op_div
+        R3 = 0
+        C1 = R4
+        jump @store_result if C1 <= 0
+            C1 = C1 - R5
+            jump @store_result if C1 < 0
+            R3 = inc R3
+            skip -3
+        jump @store_result
+
+    @op_and
+        R3 = R4 and R5
+        jump @store_result
+        
+    @op_nand
+        R3 = R4 nand R5
+        jump @store_result
+
+    @op_or
+        R3 = R4 or R5
+        jump @store_result
+        
+    @op_nor
+        R3 = R4 nor R5
+        jump @store_result
+
+    @op_xor
+        R3 = R4 xor R5
+        jump @store_result
+        
+    @op_xnor
+        R3 = R4 xnor R5
+        jump @store_result
+
+    @op_shift_left
+        R3 = shift left R5
+        jump @store_result_and_a
+
+    @op_shift_right
+        R3 = shift right R5
+        jump @store_result_and_a
+
+    @op_rotate_left
+        R3 = rotate left R5
+        jump @store_result_and_a
+
+    @op_rotate_right
+        R3 = rotate right R5
+        jump @store_result_and_a
+
+    @store_result_and_a
+    [R6] = R4
+    R6 = inc R6
+
+    @store_result
+    [R6] = R3
+    R6 = inc R6
+    write R3
+    jump @read_input
+
+# Push the number in R1 onto the stack
+@store_number
+    # Push number on stack
+    [R6] = R1
+    R6 = inc R6
+
+    # Output last input number.
+    write R1
+    jump @read_input

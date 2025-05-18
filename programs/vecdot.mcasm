@@ -1,0 +1,63 @@
+!define $dim R8
+!define $vec R9
+!define $vec2 R10
+!define $dot R11
+!define $xi R1
+!define $yi R2
+
+$dim = read
+
+@loop
+	$vec = 0
+	call @getvec
+	write $vec
+	$vec = $vec + $dim
+	call @getvec
+	write $vec
+	
+	$vec = 0
+	$vec2 = $dim
+	call @dot
+	write $dot
+	break
+jump @loop
+
+@dot
+	$dot = 0
+	C2 = $dim
+	@dot_inner
+		C2 = dec C2
+		R5 = $vec + C2
+		$xi = [R5]
+		R5 = $vec2 + C2
+		$yi = [R5]
+		call @multiply
+		$dot = $dot + R3
+	jump @dot_inner if C2 != 0
+return
+
+@getvec
+	C2 = $dim
+	@getvec_inner
+		C2 = dec C2
+		R5 = $vec + C2
+		$xi = read
+		[R5] = $xi
+	jump @getvec_inner if C2 != 0
+return
+
+@multiply
+	R3 = 0 # SUM
+	@multiply_inner
+    # Pre cycle.
+    C1 = R2
+    skip 2 if C1 != 0
+        return
+    # Add shifted B to sum
+    C1 = R2 and 1
+    skip 2 if C1 = 0
+        R3 = R3 + R1
+    # Post cycle.
+    R1 = shift left R1
+    R2 = shift right R2
+jump @multiply_inner

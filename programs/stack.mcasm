@@ -1,0 +1,17 @@
+@loop
+R1 = read
+
+C1 = R1 bit get 15
+R1 = R1 bit clear 15
+jump @push if C1 = 0
+
+@pop
+R2 = pop
+write R2
+jump @loop
+
+@push
+push R1
+R3 = peek
+write R3
+jump @loop

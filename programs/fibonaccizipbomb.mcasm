@@ -1,0 +1,32 @@
+!define $in R8
+!define $out R9
+
+@loop
+	$in = read
+	$out = 0
+	push $in
+	call @bomba
+	write $out
+jump @loop
+
+@bomba
+	R4 = pop
+	R3 = pop
+	push R4
+	C1 = dec R3
+	if C1 <= 0
+	{
+		$out = $out + R3
+		return
+	}
+	R3 = dec R3
+	push R3
+	push R3
+	call @bomba
+	R3 = pop
+	R3 = dec R3
+	push R3
+	push R3
+	call @bomba
+	R3 = pop
+return

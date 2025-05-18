@@ -1,0 +1,7 @@
+!include vector
+
+@start
+R1 = 3
+R2 = 4
+call @stdlib:vector/zeroes
+break

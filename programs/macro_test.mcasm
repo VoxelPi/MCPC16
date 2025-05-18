@@ -1,0 +1,6 @@
+# The inner macro takes prescedence.
+!define $var R1
+{
+    !define $var R2
+    $var = read
+}

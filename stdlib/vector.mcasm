@@ -1,0 +1,40 @@
+# Uses C1
+# Base pointer R1
+# Length R2
+@stdlib:vector/zeroes
+{
+    !define $base R1
+    !define $dim R2
+    !define $p R1
+
+    C1 = $dim
+    {
+        [$p] = 0
+        $p = inc $p
+        C1 = dec C1
+        repeat if C1 != 0
+    }
+    return
+}
+
+# Uses C1
+# Base pointer R1
+# Length R2
+@stdlib:vector/range
+{
+    !define $base R1
+    !define $dim R2
+    !define $p R1
+
+    write $base
+
+    C1 = $dim
+    $p = $base + $dim
+    {
+        $p = dec $p
+        C1 = dec C1
+        [$p] = C1
+        repeat if C1 != 0
+    }
+    return
+}

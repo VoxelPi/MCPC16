@@ -1,0 +1,76 @@
+R1 = 0
+
+# Bit set
+R1 = R1 bit set 0
+R1 = R1 bit set 2
+R1 = R1 bit set 4
+R1 = R1 bit set 6
+R1 = R1 bit set 8
+R1 = R1 bit set 10
+R1 = R1 bit set 12
+R1 = R1 bit set 14
+break
+
+# Bit toggle
+R1 = R1 bit toggle 0
+R1 = R1 bit toggle 1
+R1 = R1 bit toggle 2
+R1 = R1 bit toggle 3
+R1 = R1 bit toggle 4
+R1 = R1 bit toggle 5
+R1 = R1 bit toggle 6
+R1 = R1 bit toggle 7
+R1 = R1 bit toggle 8
+R1 = R1 bit toggle 9
+R1 = R1 bit toggle 10
+R1 = R1 bit toggle 11
+R1 = R1 bit toggle 12
+R1 = R1 bit toggle 13
+R1 = R1 bit toggle 14
+R1 = R1 bit toggle 15
+break
+
+# Bit Clear
+R1 = R1 bit clear 1
+# R1 = R1 bit clear 3
+R1 = R1 bit clear 5
+# R1 = R1 bit clear 7
+R1 = R1 bit clear 9
+# R1 = R1 bit clear 11
+R1 = R1 bit clear 13
+# R1 = R1 bit clear 15
+break
+
+R2 = R1 bit get 0
+write R2
+R2 = R1 bit get 1
+write R2
+R2 = R1 bit get 2
+write R2
+R2 = R1 bit get 3
+write R2
+R2 = R1 bit get 4
+write R2
+R2 = R1 bit get 5
+write R2
+R2 = R1 bit get 6
+write R2
+R2 = R1 bit get 7
+write R2
+R2 = R1 bit get 8
+write R2
+R2 = R1 bit get 9
+write R2
+R2 = R1 bit get 10
+write R2
+R2 = R1 bit get 11
+write R2
+R2 = R1 bit get 12
+write R2
+R2 = R1 bit get 13
+write R2
+R2 = R1 bit get 14
+write R2
+R2 = R1 bit get 15
+write R2
+break

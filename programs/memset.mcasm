@@ -1,0 +1,13 @@
+# @loop
+# R2 = read
+# [R1] = R2
+
+# R3 = [R1]
+# write R3
+# R1 = inc R1
+# jump @loop
+
+@loop
+[R1] = 1
+R1 = inc R1
+jump @loop

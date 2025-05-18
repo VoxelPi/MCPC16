@@ -1,0 +1,54 @@
+C1 = read
+if C1 = 0
+    write 11
+
+C1 = read
+if C1 = 0
+{
+    write 0
+    write 1
+}
+
+{
+    C1 = read
+    exit if C1 != 0
+    write 0
+    write 1
+}
+
+C1 = read
+{
+    R1 = R1 + 2
+    C1 = dec C1
+    repeat if C1 != 0
+}
+write R1
+
+C1 = read
+{
+    R1 = R1 + 2
+
+    C1 = dec C1
+    exit if C1 != 0
+    repeat
+}
+
+R1 = read
+R2 = read
+
+R3 = 0
+C1 = R1
+@outer {
+    C2 = R2
+    {
+        write R3
+        R3 = R3 + 1
+
+        C2 = dec C2
+        repeat if C2 >= 0
+    }
+
+    R3 = R3 + 255
+    C1 = dec C1
+    repeat @outer if C1 >= 0
+}

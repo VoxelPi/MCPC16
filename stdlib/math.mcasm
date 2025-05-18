@@ -1,0 +1,38 @@
+# Calculates A * B
+# Before the calculation is started the two arguments are conditionally swapped, 
+# to ensure that in the calculation A > B.
+# Input A in R1 (destroyed)
+# Input B in R2 (destroyed)
+# Output in R3
+# Uses C1
+@stdlib:math/multiply
+C1 = R1 - R2
+skip 4 if C1 > 0
+R3 = R1
+R1 = R2
+R2 = R3
+
+# Calculates A * B
+# Faster if A > B
+# Input A in R1 (destroyed)
+# Input B in R2 (destroyed)
+# Output in R3
+# Uses C1
+@stdlib:math/multiply_sorted
+R3 = 0 # SUM
+{
+    # Pre cycle.
+    C1 = R2
+    if C1 = 0
+        return
+
+    # Add shifted B to sum
+    C1 = R2 and 1
+    if C1 != 0
+        R3 = R3 + R1
+
+    # Post cycle.
+    R1 = shift left R1
+    R2 = shift right R2
+    repeat
+}

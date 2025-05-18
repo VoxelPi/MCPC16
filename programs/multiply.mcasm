@@ -1,0 +1,71 @@
+R1 = read # A
+R2 = read # B
+call @multiply_swap
+
+write R3
+break
+
+jump 0
+
+
+# Input A in R1 (destroyed)
+# Input B in R2 (destroyed)
+# Output in R3
+# Uses C1
+@multiply_swap
+C1 = R1 - R2
+skip 4 if C1 > 0
+R3 = R1
+R1 = R2
+R2 = R3
+
+# Faster if A > B
+# Input A in R1 (destroyed)
+# Input B in R2 (destroyed)
+# Output in R3
+# Uses C1
+@multiply
+R3 = 0 # SUM
+
+@loop_multiply
+    # Pre cycle.
+    C1 = R2
+    skip 2 if C1 != 0
+        return
+
+    # Add shifted B to sum
+    C1 = R2 and 1
+    skip 2 if C1 = 0
+        R3 = R3 + R1
+
+    # Post cycle.
+    R1 = shift left R1
+    R2 = shift right R2
+jump @loop_multiply
+
+
+
+
+# # Input A in R1
+# # Input B in R2
+# # Output in R3
+# # Uses R4, C1
+# @multiply_fixed
+# R3 = 0 # SUM
+# R4 = 0 # shift count
+
+# @loop_multiply_fixed
+#     # Pre cycle.
+#     C1 = 16 - R4
+#     skip 2 if C1 > 0
+#         return
+
+#     # Add shifted B to sum
+#     C1 = R2 bit get R4
+#     skip 2 if C1 = 0
+#         R3 = R3 + R1
+
+#     # Post cycle.
+#     R1 = shift left R1
+#     R4 = inc R4
+# jump @loop_multiply_fixed

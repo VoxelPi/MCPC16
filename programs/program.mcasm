@@ -1,0 +1,44 @@
+R7 = 0x8001
+R8 = 1
+
+!define $vec1 R6
+$vec1 = 0 
+
+@loop
+# R3 = 1 + 0x7FFF
+R3 = 1 - 0x8001
+break
+R4 = R8 - R7
+break
+jump @loop
+
+R1 = 63
+break
+R3 = R1 and 0b10101010
+break
+R3 = R1 nand 0b10101010
+break
+R3 = R1 or 0b10101010
+break
+R3 = R1 nor 0b10101010
+break
+R3 = R1 xor 0b10101010
+break
+R3 = R1 xnor 0b10101010
+break
+R3 = shift left 0b11001010
+break
+R3 = shift right 0b11001010
+break
+R3 = rotate left 0b1000000011001010
+break
+R3 = rotate right 0b1000000011001011
+break
+R3 = R1 + 0b10101010
+break
+R3 = R1 - 0b10101010
+break
+R3 = inc R1
+break
+R3 = dec R1
+break
