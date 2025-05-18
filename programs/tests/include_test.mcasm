@@ -1,0 +1,5 @@
+# This is an "inline function call"
+!include vector @stdlib:vector/zeroes as @my_zeroes
+
+write R1
+write R2

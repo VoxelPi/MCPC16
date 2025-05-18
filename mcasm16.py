@@ -670,8 +670,14 @@ def _prepare_instructions(
             i_line += 1
             continue
 
+        # Parse include parts.
+        include_parts = line_text.split(" ")
+        n_include_parts = len(include_parts)
+        if n_include_parts < 2:
+            raise AssemblySyntaxError(instructions[i_line].source, "Invalid include statement, missing input argument")
+        
         # Include statement.
-        include_target_id = line_text[9:]
+        include_target_id = include_parts[1]
         include_file_path: pathlib.Path | None = None
         for include_directory in include_directories:
             file_path = include_directory / f"{include_target_id}.mcasm"
@@ -693,6 +699,72 @@ def _prepare_instructions(
         # Prepare include lines recursivly.
         include_instructions = _prepare_instructions(include_src_lines, str(include_file_path), include_directories, global_scope, included_units)
 
+        # Check if a include scope is specified.
+        # In this case all instructions of `include_instructions` outside of the target scope are filtered out,
+        # so that only the target scope is included. 
+        if n_include_parts > 2:
+            # Parse target scope name.
+            include_scope_name = include_parts[2]
+            if not include_scope_name.startswith("@"):
+                raise AssemblySyntaxError(instructions[i_line].source, f"Invalid scope name '{include_scope_name}' doesn't start with '@'.")
+
+            # Search for scope start. ('<label> {').
+            while len(include_instructions) > 0:
+                if include_instructions[0].text == f"{include_scope_name} {'{'}":
+                    break
+                del include_instructions[0]
+            else:
+                raise AssemblyError(instructions[i_line].source, f"No scope with the name '{include_scope_name}' found in unit '{str(include_file_path)}'.")
+
+            # Search for corresponding closing bracket.
+            include_scope_length = 1
+            i_scope = 1
+            while include_scope_length < len(include_instructions):
+
+                # Scope is closed.
+                if "}" in include_instructions[include_scope_length].text:
+                    i_scope -= 1
+
+                    # Check if main scope was closed.
+                    if i_scope <= 0:
+                        # Add one to length and return.
+                        include_scope_length += 1
+                        break
+
+                # Open sub scope.
+                elif "{" in include_instructions[include_scope_length].text:
+                    i_scope += 1
+
+                # Increment length.
+                include_scope_length += 1
+            else:
+                raise AssemblyError(instructions[i_line].source, f"Scope '{include_scope_name}' in unit '{str(include_file_path)}' is not closed.")
+
+            # Remove remaining include instructions.
+            include_instructions = include_instructions[:include_scope_length]
+
+            # Check if scope alias is specified
+            if n_include_parts > 3:
+                if n_include_parts != 5 or include_parts[3] != "as":
+                    raise AssemblySyntaxError(instructions[i_line].source, "Invalid include. Syntax is '!include <unit> @<scope> as @<alias>'.")
+
+                # Parse alias scope name.
+                scope_alias_name = include_parts[4]
+                if not scope_alias_name.startswith("@"):
+                    raise AssemblySyntaxError(instructions[i_line].source, f"Invalid scope alias name '{scope_alias_name}' doesn't start with '@'.")
+
+                # Replace scope name with alias.
+                for instruction in include_instructions:
+                    # Add whitespace to fix word replace at line start / end
+                    instruction.text = f" {instruction.text} "
+
+                    # Apply labels.
+                    instruction.text = instruction.text.replace(f" {include_scope_name} ", f" {scope_alias_name} ")
+                    instruction.text = instruction.text.replace(f"[{include_scope_name}]", f"[{scope_alias_name}]")
+
+                    # Remove previously added whitespace.
+                    instruction.text = instruction.text[1:-1]
+                                
         # Replace include statement with included lines.
         instructions = instructions[:i_line] + include_instructions + instructions[(i_line+1):]
 

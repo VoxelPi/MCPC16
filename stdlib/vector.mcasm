@@ -1,13 +1,13 @@
 # Uses C1
 # Base pointer R1
 # Length R2
-@stdlib:vector/zeroes
-{
+@stdlib:vector/zeroes {
     !define $base R1
     !define $dim R2
     !define $p R1
 
     C1 = $dim
+    write @stdlib:vector/zeroes
     {
         [$p] = 0
         $p = inc $p
@@ -20,8 +20,7 @@
 # Uses C1
 # Base pointer R1
 # Length R2
-@stdlib:vector/range
-{
+@stdlib:vector/range {
     !define $base R1
     !define $dim R2
     !define $p R1
