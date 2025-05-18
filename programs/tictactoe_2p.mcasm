@@ -1,0 +1,66 @@
+!define $flag1 R8
+!define $flag2 R9
+!define $player C2
+!define $input R10
+!define $tocheck R11
+!define $move R12
+
+@global:start {
+	$flag1 = 0
+	$flag2 = 0
+	$player = 0
+	$move = 0
+	{
+		write $player
+		$input = read
+		C1 = $input and $flag1
+		repeat if C1 != 0 #illegal move detection
+		$flag1 = $flag1 or $input
+		$flag2 = $flag2 xor $input if $player != 0
+		
+		$tocheck = $flag2
+		$tocheck = $flag1 xor $flag2 if $player = 0
+		
+		C1 = $move - 4
+		if C1 >= 0
+		{
+			C1 = $tocheck and 0b000000111
+			C1 = C1 xor 0b000000111
+			jump @win if C1 = 0 #row 1
+			C1 = $tocheck and 0b000111000
+			C1 = C1 xor 0b000111000
+			jump @win if C1 = 0 #row 2
+			C1 = $tocheck and 0b111000000
+			C1 = C1 xor 0b111000000
+			jump @win if C1 = 0 #row 3
+			C1 = $tocheck and 0b001001001
+			C1 = C1 xor 0b001001001
+			jump @win if C1 = 0 #column 1
+			C1 = $tocheck and 0b010010010
+			C1 = C1 xor 0b010010010
+			jump @win if C1 = 0 #column 2
+			C1 = $tocheck and 0b100100100
+			C1 = C1 xor 0b100100100
+			jump @win if C1 = 0 #column 3
+			C1 = $tocheck and 0b100010001
+			C1 = C1 xor 0b100010001
+			jump @win if C1 = 0 #diagonal 1
+			C1 = $tocheck and 0b001010100
+			C1 = C1 xor 0b001010100
+			jump @win if C1 = 0 #diagonal 2
+		}
+		$move = $move + 1
+		
+		C1 = $flag1 xor 0b0000000111111111
+		$player = $player bit toggle 0
+		repeat if C1 != 0
+		write 2
+		break
+		exit
+		
+		@win
+		write $player
+		break
+	}
+	repeat
+}
