@@ -959,18 +959,19 @@ if __name__ == "__main__":
     argument_parser.add_argument("filename", nargs="?", default="./programs/stdlib_test.mcasm")
     argument_parser.add_argument("-o", "--output")
     argument_parser.add_argument("-c", "--check", action="store_true")
-    argument_parser.add_argument("-m", "--mappings", action="store_true")
+    argument_parser.add_argument("-p", "--pre", action="store_true")
     arguments = argument_parser.parse_args()
     input_filename: str = arguments.filename
     output_filename: str | None = arguments.output
     check_mode: bool = arguments.check
-    generate_mappings: bool = arguments.mappings
+    output_preprocessed: bool = arguments.pre
 
     # Resolve input and output file path.
     input_filepath = pathlib.Path(input_filename)
     if output_filename is None:
-        output_filename = f"{input_filepath.stem}.mcbin"
+        output_filename = f"output/{input_filepath.stem}.mcbin"
     output_filepath = pathlib.Path(output_filename)
+    output_filepath.parent.mkdir(parents=True, exist_ok=True)
 
     # Prepare include paths.
     include_paths: list[pathlib.Path] = [
@@ -1005,14 +1006,17 @@ if __name__ == "__main__":
         with open(output_filepath, "wb") as output_file:
             output_file.write(program.binary.tobytes())
 
-    # Generate mappings if enabled.
-    if generate_mappings:
-        mappings_path = output_filepath.parent / f"{output_filepath.stem}.mcmap"
+    # Output preprocessed assembly if flag is enabled. 
+    if output_preprocessed:
+        mappings_path = output_filepath.parent / f"{output_filepath.stem}.pre.mcasm"
         with open(mappings_path, "w") as mappings_file:
-            max_instruction_source_length = np.max([len(line.source.text) for line in program.instructions])
+            max_instruction_line_length = np.max([len(line.text) for line in program.instructions])
 
             for instruction in program.instructions:
-                mappings_file.write(f"{instruction.source.text.ljust(max_instruction_source_length + 3)} # line {instruction.source.line + 1:5d} of unit \"{instruction.source.unit}\"\n")
+                if instruction.source.unit == GENERATED_UNIT_NAME:
+                    mappings_file.write(f"{instruction.text.ljust(max_instruction_line_length + 3)} # generated\n")
+                else:
+                    mappings_file.write(f"{instruction.text.ljust(max_instruction_line_length + 3)} # line {instruction.source.line + 1:5d} of unit \"{instruction.source.unit}\"\n")
 
     # Summary output.
     print(f"Assembled {len(program.instructions)} instructions")

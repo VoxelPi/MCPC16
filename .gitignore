@@ -2,6 +2,7 @@ output/
 *.lnk
 *.mcbin
 *.mcmap
+*.pre.mcasm
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
