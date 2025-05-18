@@ -7,7 +7,8 @@ from mcpc16 import Register, Condition, Operation, encode_instruction, PROGRAM_M
 import argparse
 from dataclasses import dataclass
 
-START_LABEL = "global:start"
+GENERATED_UNIT_NAME = "__generated__"
+START_LABEL_NAME = "global:start"
 GLOBAL_SCOPE_NAME = "__global__"
 
 ASSEMBLER_MACROS = {
@@ -717,14 +718,14 @@ def assemble(
     # Early exit if program is empty.
     if len(src_lines) == 0:
         return AssembledProgram(np.zeros(1, dtype=np.uint64), [], [], global_scope)
-    
-    # Insert initialization jump.
-    src_lines.insert(0, f"jump @{START_LABEL}")
 
     # Prepare the source lines.
     # This handles things like comments, whitespace simplifcation and lowercase transforamtion, 
     # as well as the !include statement.
     instructions = _prepare_instructions(src_lines, str(unit), include_directories, global_scope)
+    
+    # Insert initialization jump.
+    instructions.insert(0, AssemblyInstruction(AssemblySourceLine(GENERATED_UNIT_NAME, 0, f"jump @{START_LABEL_NAME}"), f"jump @{START_LABEL_NAME}", global_scope))
 
     # Preprocessor
     # Handles labels, macros
@@ -817,10 +818,10 @@ def assemble(
         i_instruction += 1
 
     # Make sure that the start label is defined.
-    if global_scope.find_label(START_LABEL) is None:
+    if global_scope.find_label(START_LABEL_NAME) is None:
         # If the start label has not been defined in the source code, define it here at instruction 1.
         # Instruction 0 must be skipped, as this is the initial jump.
-        global_scope.create_label(START_LABEL, 1, None)
+        global_scope.create_label(START_LABEL_NAME, 1, None)
 
     # Count instructions. The number of instruction doesn't change after this point.
     n_instructions = len(instructions)
