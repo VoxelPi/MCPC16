@@ -848,42 +848,7 @@ def assemble(
     # Count instructions. The number of instruction doesn't change after this point.
     n_instructions = len(instructions)
 
-    # Transform repeat / exit statements into jumps.
-    for instruction in instructions:
-        # Check if instruction is a repeat.
-        instruction_parts = instruction.text.split(" ")
-        n_instruction_parts = len(instruction_parts)
-        if n_instruction_parts < 1 or (instruction_parts[0] not in ["repeat", "exit"]):
-            continue
-
-        i_remaining_parts = 1
-
-        # Check if label is specified
-        scope = instruction.scope
-        if n_instruction_parts > 1 and instruction_parts[1].startswith("@"):
-            target_scope_name = instruction_parts[1][1:] # Skip '@' symbol.
-            i_remaining_parts = 2
-
-            # Search scope with name.
-            while scope is not None:
-                if scope.name == target_scope_name:
-                    break
-                scope = scope.parent
-            else:
-                # This is only executed if the loop exited "naturally", which means the scope was not found.
-                raise AssemblySyntaxError(instruction.source, f"Unknown parent scope '@{target_scope_name}'")
-        
-        remaining_part = " ".join(instruction_parts[i_remaining_parts:])
-
-        match instruction_parts[0]:
-            case "repeat":
-                instruction.text = f"jump {scope.start} {remaining_part}"
-            case "exit":
-                instruction.text = f"jump {scope.end} {remaining_part}"
-            case _:
-                raise AssemblyError(instruction.source, f"Invalid scope statement '{instruction_parts[0]}'")
-
-    # Apply labels and macros.
+    # Apply macros.
     for instruction in instructions:
         # Add whitespace to fix word replace at line start / end
         instruction.text = f" {instruction.text} "
@@ -931,6 +896,49 @@ def assemble(
             else:
                 macro_id = instruction.text[i_macro_start]
             raise AssemblyError(instruction.source, f"Unable to resolve macro '{macro_id}'.")
+        
+        # Remove previously added whitespace.
+        instruction.text = instruction.text[1:-1]
+
+    # Transform repeat / exit statements into jumps.
+    for instruction in instructions:
+        # Check if instruction is a repeat.
+        instruction_parts = instruction.text.split(" ")
+        n_instruction_parts = len(instruction_parts)
+        if n_instruction_parts < 1 or (instruction_parts[0] not in ["repeat", "exit"]):
+            continue
+
+        i_remaining_parts = 1
+
+        # Check if label is specified
+        scope = instruction.scope
+        if n_instruction_parts > 1 and instruction_parts[1].startswith("@"):
+            target_scope_name = instruction_parts[1][1:] # Skip '@' symbol.
+            i_remaining_parts = 2
+
+            # Search scope with name.
+            while scope is not None:
+                if scope.name == target_scope_name:
+                    break
+                scope = scope.parent
+            else:
+                # This is only executed if the loop exited "naturally", which means the scope was not found.
+                raise AssemblySyntaxError(instruction.source, f"Unknown parent scope '@{target_scope_name}'")
+        
+        remaining_part = " ".join(instruction_parts[i_remaining_parts:])
+
+        match instruction_parts[0]:
+            case "repeat":
+                instruction.text = f"jump {scope.start} {remaining_part}"
+            case "exit":
+                instruction.text = f"jump {scope.end} {remaining_part}"
+            case _:
+                raise AssemblyError(instruction.source, f"Invalid scope statement '{instruction_parts[0]}'")
+
+    # Apply labels
+    for instruction in instructions:
+        # Add whitespace to fix word replace at line start / end
+        instruction.text = f" {instruction.text} "
 
         # Apply labels.
         for label in instruction.scope.visible_labels().values():
