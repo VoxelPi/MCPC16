@@ -121,14 +121,14 @@ class Emulator:
                 return (np.uint16(1), True) # TODO: Actually check if input is available
             case Operation.IO_READ:
                 while True:
-                    value = input("[IO] Input a number: ")
+                    value = input("[INPUT] ")
                     try:
                         return (np.uint16(int(value, 0) & 0xFFFF), True)
                     except Exception:
                         print(f"Invalid number input '{value}', please try again")
                 
             case Operation.IO_WRITE:
-                print(f"[IO] uint16: {a} | int16: {a.view(np.int16)}")
+                print(f"[OUTPUT] uint16: {a} | int16: {a.view(np.int16)}")
                 return (a, False) # Return the value
             
             case Operation.STACK_PEEK:
