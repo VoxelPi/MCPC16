@@ -4,3 +4,7 @@
     !define $var R2
     $var = read
 }
+
+!define $test1 C1
+!define $test2 $test1
+write $test2

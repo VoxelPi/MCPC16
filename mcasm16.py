@@ -911,9 +911,29 @@ def assemble(
         instruction.text = f" {instruction.text} "
 
         # Apply macros.
-        for macro in instruction.scope.visible_macros().values():
-            instruction.text = instruction.text.replace(f" {macro.name} ", f" {macro.value} ")
-            instruction.text = instruction.text.replace(f"[{macro.name}]", f"[{macro.value}]")
+        # Because the value of a macro could be the key of another macro, all macros are applied repeatedly,
+        # until there are no more changes.
+        # To check for cyclic dependencies, previous_instruction_states keeps track of 
+        # all previously seen states of this line.
+        previous_instruction_states: set[str] = set()
+        while instruction.text not in previous_instruction_states:
+            previous_instruction_states.add(instruction.text)
+
+            # Apply all macros and count the numbe
+            unchanged = True
+            for macro in instruction.scope.visible_macros().values():
+                if f" {macro.name} " in instruction.text:
+                    instruction.text = instruction.text.replace(f" {macro.name} ", f" {macro.value} ")
+                    unchanged = False
+                if f"[{macro.name}]" in instruction.text:
+                    instruction.text = instruction.text.replace(f"[{macro.name}]", f"[{macro.value}]")
+                    unchanged = False
+
+            # Break if line remained unchanged.
+            if unchanged:
+                break
+        else:
+            raise AssemblyError(instruction.source, "Cyclic macro definition.")
 
         # Check for unresolved macros.
         if " $" in instruction.text:
