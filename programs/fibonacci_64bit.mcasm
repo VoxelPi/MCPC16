@@ -1,0 +1,31 @@
+# A: R1..R4
+# B: R5..R8
+# C: R9..R12
+
+R5 = 1
+R13 = 2
+
+{
+    # C = A + B
+    R9 = R1 + R5
+    R10 = R2 +c R6
+    R11 = R3 +c R7
+    R12 = R4 +c R8
+    R13 = inc R13
+
+    # A = B + C
+    R1 = R5 + R9
+    R2 = R6 +c R10
+    R3 = R7 +c R11
+    R4 = R8 +c R12
+    R13 = inc R13
+
+    # B = C + A
+    R5 = R9 + R1
+    R6 = R10 +c R2
+    R7 = R11 +c R3
+    R8 = R12 +c R4
+    R13 = inc R13
+    
+    repeat
+}

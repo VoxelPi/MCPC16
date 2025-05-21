@@ -1,0 +1,25 @@
+# A: R1..R2
+# B: R3..R4
+# C: R5..R6
+
+R3 = 1
+R13 = 2
+
+{
+    # C = A + B
+    R5 = R1 +  R3
+    R6 = R2 +c R4
+    R13 = inc R13
+
+    # A = B + C
+    R1 = R3 +  R5
+    R2 = R4 +c R6
+    R13 = inc R13
+
+    # B = C + A
+    R3 = R5 +  R1
+    R4 = R6 +c R2
+    R13 = inc R13
+    
+    repeat
+}
