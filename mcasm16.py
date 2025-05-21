@@ -281,6 +281,8 @@ binary_operations = {
     '*': Operation.MULTIPLY,
     '/': Operation.DIVIDE,
     '%': Operation.MODULO,
+    '+c': Operation.ADD_WITH_CARRY, 
+    '-c': Operation.SUB_WITH_CARRY,
 }
 
 # Unary operators.

@@ -62,8 +62,8 @@ class Operation(Enum):
     BIT_CLEAR = 27
     BIT_TOGGLE = 28
 
-    UNDEFINED_29 = 29
-    UNDEFINED_30 = 30
+    ADD_WITH_CARRY = 29
+    SUB_WITH_CARRY = 30
     UNDEFINED_31 = 31
     UNDEFINED_32 = 32
     UNDEFINED_33 = 33

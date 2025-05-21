@@ -16,6 +16,7 @@ class Emulator:
     stack = np.zeros(STACK_SIZE, dtype=np.uint16)
     stack_pointer = np.uint16(0xFFFF)
     halt: bool = False
+    carry: bool = False
 
     @property
     def pc(self) -> np.uint16:
@@ -89,18 +90,42 @@ class Emulator:
             case Operation.DEC:
                 return (a - 1, True)
             case Operation.ADD:
-                return (a + b, True)
+                a_big = np.uint32(a)
+                b_big = np.uint32(b)
+                self.carry = (a + b >> 16) != 0
+                return (np.uint16((a_big + b_big) & 0xFFFF), True)
             case Operation.SUB:
-                return (a - b, True)
+                a_big = np.uint32(a)
+                b_big = np.uint32(b)
+                self.carry = (a - b >> 16) != 0
+                return (np.uint16((a_big - b_big) & 0xFFFF), True)
+            
+            case Operation.ADD_WITH_CARRY:
+                a_big = np.uint32(a)
+                b_big = np.uint32(b)
+                result = np.uint16((a_big + b_big + self.carry) & 0xFFFF)
+                self.carry = (a + b + self.carry >> 16) != 0
+                return (result, True)
+            case Operation.SUB_WITH_CARRY:
+                a_big = np.uint32(a)
+                b_big = np.uint32(b)
+                result = np.uint16((a_big - b_big - (1 - self.carry)) & 0xFFFF)
+                self.carry = (a - b - (1 - self.carry) >> 16) != 0
+                return (result, True)
             
             case Operation.SHIFT_LEFT:
+                self.carry = (a & 0x8000) != 0
                 return (np.uint16(a << 1), True)
             case Operation.SHIFT_RIGHT:
+                self.carry = (a & 0x0001) != 0
                 return (np.uint16(a >> 1), True)
             case Operation.ROTATE_LEFT:
-                return (np.uint16((a << 1) | ((a >> 15) & 0b1)), True)
+                result = (np.uint16((a << 1) | (1 if self.carry else 0)), True)
+                self.carry = (a & 0x8000) != 0
+                return result
             case Operation.ROTATE_RIGHT:
-                return (np.uint16((a >> 1) | ((a & 0b1) << 15)), True)
+                self.carry = (a & 0x0001) != 0
+                return (np.uint16((a >> 1) | (1 if self.carry else 0)), True)
             
             case Operation.BIT_GET:
                 return (np.uint16((a >> b) & 0b1 != 0), True)
