@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 import numpy as np
+import numpy.typing as npt
 
 REGISTER_COUNT = 0x10
 PROGRAM_MEMORY_SIZE = 0x10000
@@ -138,35 +139,28 @@ def condition_source(register: Register) -> int:
         case _:
             raise Exception(f"Register {register} can't be used for conditions")
 
-def encode_instruction(
-    operation: Operation, 
-    condition_register: Register, 
-    condition: Condition, 
-    output: Register, 
-    a: Register | np.uint16 | int, 
-    b: Register | np.uint16 | int,
-) -> np.uint64:
-    if isinstance(a, Register):
-        a_value = np.uint64(a.value)
+def encode_instruction(instruction: Instruction) -> np.uint64:
+    if isinstance(instruction.a, Register):
+        a_value = np.uint64(instruction.a.value)
         a_mode = np.uint64(1)
     else:
-        a_value = np.uint64(a & 0xFFFF)
+        a_value = np.uint64(instruction.a & 0xFFFF)
         a_mode = np.uint64(0)
 
-    if isinstance(b, Register):
-        b_value = np.uint64(b.value)
+    if isinstance(instruction.b, Register):
+        b_value = np.uint64(instruction.b.value)
         b_mode = np.uint64(1)
     else:
-        b_value = np.uint64(b & 0xFFFF)
+        b_value = np.uint64(instruction.b & 0xFFFF)
         b_mode = np.uint64(0)
     
     opcode = np.uint64(0)
     opcode |= np.uint64(a_mode) << 0 # A source
     opcode |= np.uint64(b_mode) << 1 # B source
-    opcode |= np.uint64(output.value) << 2 # Output address
-    opcode |= np.uint64(condition.value) << 6 # Condition
-    opcode |= np.uint64(condition_source(condition_register) & 0b1) << 9 # Condition source
-    opcode |= np.uint64(operation.value) << 10 # Operation
+    opcode |= np.uint64(instruction.output_register.value) << 2 # Output address
+    opcode |= np.uint64(instruction.condition.value) << 6 # Condition
+    opcode |= np.uint64(condition_source(instruction.condition_register) & 0b1) << 9 # Condition source
+    opcode |= np.uint64(instruction.operation.value) << 10 # Operation
     opcode |= np.uint64(a_value) << 16 # A value
     opcode |= np.uint64(b_value) << 32 # B Value
     return np.uint64(opcode)
@@ -198,3 +192,17 @@ def decode_instruction(instruction: np.uint64) -> Instruction:
 
     # Return instruction.
     return Instruction(operation, condition_source, condition, output_register, a, b)
+
+def encode_program(instructions: list[Instruction]) -> npt.NDArray[np.uint64]:
+    n_instructions = len(instructions)
+    encoded_instructions = np.zeros(n_instructions, dtype=np.uint64)
+    for i_instruction, instruction in enumerate(instructions):
+        encoded_instructions[i_instruction] = encode_instruction(instruction)
+
+    return encoded_instructions
+
+def decode_program(program: npt.NDArray[np.uint64]) -> list[Instruction]:
+    instructions: list[Instruction] = []
+    for encoded_instruction in program:
+        instructions.append(decode_instruction(encoded_instruction))
+    return instructions

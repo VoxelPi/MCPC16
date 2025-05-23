@@ -6,14 +6,14 @@ import numpy.typing as npt
 import pathlib
 import time
 
-from mcpc16 import MEMORY_SIZE, PROGRAM_MEMORY_SIZE, REGISTER_COUNT, STACK_SIZE, Condition, Operation, Register, decode_instruction
+from mcpc16 import MEMORY_SIZE, PROGRAM_MEMORY_SIZE, REGISTER_COUNT, STACK_SIZE, Condition, Instruction, Operation, Register, decode_program
 import mcasm16
 
 class Emulator:
-    program = np.zeros(PROGRAM_MEMORY_SIZE, dtype=np.uint64)
-    registers = np.zeros(REGISTER_COUNT, dtype=np.uint16)
-    memory = np.zeros(MEMORY_SIZE, dtype=np.uint16)
-    stack = np.zeros(STACK_SIZE, dtype=np.uint16)
+    program: list[Instruction] = []
+    registers: npt.NDArray[np.uint16] = np.zeros(REGISTER_COUNT, dtype=np.uint16)
+    memory: npt.NDArray[np.uint16] = np.zeros(MEMORY_SIZE, dtype=np.uint16)
+    stack: npt.NDArray[np.uint16] = np.zeros(STACK_SIZE, dtype=np.uint16)
     stack_pointer = np.uint16(0xFFFF)
     halt: bool = False
     carry: bool = False
@@ -38,10 +38,10 @@ class Emulator:
         self.stack = np.zeros(STACK_SIZE, dtype=np.uint16)
         self.stack_pointer = np.uint16(0xFFFF)
 
-    def load_program(self, program: npt.NDArray[np.uint64]):
-        n_instructions = len(program)
-        self.program = np.zeros(PROGRAM_MEMORY_SIZE, np.uint64)
-        self.program[0:n_instructions] = program[0:n_instructions]
+    def load_program(self, program: list[Instruction]):
+        if (len(program) > PROGRAM_MEMORY_SIZE):
+            raise Exception("The specified program is to big for this architecture.")
+        self.program = program
         self.initialize()
 
     def evaluate_condition(self, condition: Condition, value: np.uint16) -> bool:
@@ -189,10 +189,10 @@ class Emulator:
 
     def execute_instruction(self):
         # Fetch instruction.
-        instruction_opcode = self.program[self.pc]
-
-        # Decode instruction.
-        instruction = decode_instruction(instruction_opcode)
+        if self.pc >= 0 and self.pc < len(self.program):
+            instruction = self.program[self.pc]
+        else:
+            instruction = Instruction(Operation.A, Register.R15, Condition.ALWAYS, Register.PC, np.uint(0), np.uint(0))
 
         # Execute instruction.
         a_value = self.register_value(instruction.a) if isinstance(instruction.a, Register) else instruction.a
@@ -262,13 +262,14 @@ if __name__ == "__main__":
             print("Failed to assemble program.", file=sys.stderr)
             exit(1)
 
-        print(f"Assembled {len(assembled_program.instructions)} instructions")
-        program = assembled_program.binary
+        print(f"Assembled {len(assembled_program.statements)} instructions")
+        program = assembled_program.instructions
     
     else:
         # Program is binary.
         with open(input_filepath, "rb") as input_file:
-            program = np.frombuffer(input_file.read(), dtype=np.uint64)
+            encoded_program = np.frombuffer(input_file.read(), dtype=np.uint64)
+            program = decode_program(encoded_program)
             print(f"Loaded {len(program)} instructions")
 
     emulator = Emulator()

@@ -3,7 +3,7 @@ import sys
 import numpy as np
 import numpy.typing as npt
 import pathlib
-from mcpc16 import Register, Condition, Operation, encode_instruction, PROGRAM_MEMORY_SIZE, inverse_condition
+from mcpc16 import Instruction, Register, Condition, Operation, PROGRAM_MEMORY_SIZE, encode_program, inverse_condition
 import argparse
 from dataclasses import dataclass
 
@@ -152,21 +152,21 @@ class AssemblySourceLine():
     text: str
 
 @dataclass
-class AssemblyInstruction():
+class AssemblyStatement():
     source: AssemblySourceLine
     text: str
     scope: AssemblyScope
 
 @dataclass
 class AssembledProgram():
-    binary: npt.NDArray[np.uint64]
+    instructions: list[Instruction]
+    statements: list[AssemblyStatement]
     text: list[str]
-    instructions: list[AssemblyInstruction]
     global_scope: AssemblyScope
 
     @property
     def n_instructions(self) -> int:
-        return len(self.instructions)
+        return len(self.statements)
 
 # region assembler exceptions
 
@@ -301,7 +301,7 @@ no_args_instructions = {
     'break': Operation.BREAK,
 }
 
-def _parse_instruction(instruction: AssemblyInstruction) -> np.uint64:
+def _parse_instruction(instruction: AssemblyStatement) -> Instruction:
     source_line = instruction.source
     instruction_text = instruction.text
     instruction_parts = instruction_text.split(" ")
@@ -343,12 +343,12 @@ def _parse_instruction(instruction: AssemblyInstruction) -> np.uint64:
 
     # RETURN
     if instruction_text == "return":
-        return encode_instruction(Operation.STACK_POP, condition_register, condition, Register.PC, 0, 0)
+        return Instruction(Operation.STACK_POP, condition_register, condition, Register.PC, np.uint16(0), np.uint16(0))
 
     # NO ARGS
     if instruction_text in no_args_instructions:
         operation = no_args_instructions[instruction_text]
-        return encode_instruction(operation, condition_register, Condition.NEVER, Register.R1, Register.R1, Register.R1)
+        return Instruction(operation, condition_register, Condition.NEVER, Register.R1, Register.R1, Register.R1)
 
     # JUMP
     if instruction_parts[0] == 'jump':
@@ -362,7 +362,7 @@ def _parse_instruction(instruction: AssemblyInstruction) -> np.uint64:
             raise AssemblySyntaxError(source_line, f"Invalid jump target '{instruction_parts[1]}'.")
         
         # Encode instruction.
-        return encode_instruction(Operation.A, condition_register, condition, Register.PC, value, 0)
+        return Instruction(Operation.A, condition_register, condition, Register.PC, value, np.uint16(0))
         
     # SKIP
     if instruction_parts[0] == 'skip':
@@ -376,7 +376,7 @@ def _parse_instruction(instruction: AssemblyInstruction) -> np.uint64:
             raise AssemblySyntaxError(source_line, f"Invalid skip length '{instruction_parts[1]}'.")
         
         # Encode instruction.
-        return encode_instruction(Operation.ADD, condition_register, condition, Register.PC, value, Register.PC)
+        return Instruction(Operation.ADD, condition_register, condition, Register.PC, value, Register.PC)
 
     # Assignments, that are instructions of the form '<output_register> = ...'
     if n_instruction_parts >= 2 and is_register(instruction_parts[0]) and instruction_parts[1] == "=":
@@ -392,7 +392,7 @@ def _parse_instruction(instruction: AssemblyInstruction) -> np.uint64:
             # value, '<r> = <value>'
             value = parse_value(value_text)
             if value is not None:
-                return encode_instruction(Operation.A, condition_register, condition, output_register, value, Register.R1)
+                return Instruction(Operation.A, condition_register, condition, output_register, value, Register.R1)
 
             # memory, '<r> = [<address>]'
             if value_text[0] == "[" and value_text[-1] == "]":
@@ -403,23 +403,23 @@ def _parse_instruction(instruction: AssemblyInstruction) -> np.uint64:
                     raise AssemblySyntaxError(source_line, f"Invalid value for memory address: '{address_text}'.")
 
                 # Encode instruction.
-                return encode_instruction(Operation.MEMORY_LOAD, condition_register, condition, output_register, address, 0)
+                return Instruction(Operation.MEMORY_LOAD, condition_register, condition, output_register, address, np.uint16(0))
 
             # io poll, '<r> = poll'
             if value_text == "poll":
-                return encode_instruction(Operation.IO_POLL, condition_register, condition, output_register, 0, 0)
+                return Instruction(Operation.IO_POLL, condition_register, condition, output_register, np.uint16(0), np.uint16(0))
 
             # io read, '<r> = read'
             if value_text == "read":
-                return encode_instruction(Operation.IO_READ, condition_register, condition, output_register, 0, 0)
+                return Instruction(Operation.IO_READ, condition_register, condition, output_register, np.uint16(0), np.uint16(0))
             
             # stack peek, '<r> = peek'
             if value_text == "peek":
-                return encode_instruction(Operation.STACK_PEEK, condition_register, condition, output_register, 0, 0)
+                return Instruction(Operation.STACK_PEEK, condition_register, condition, output_register, np.uint16(0), np.uint16(0))
             
             # stack pop, '<r> = pop'
             if value_text == "pop":
-                return encode_instruction(Operation.STACK_POP, condition_register, condition, output_register, 0, 0)
+                return Instruction(Operation.STACK_POP, condition_register, condition, output_register, np.uint16(0), np.uint16(0))
 
             # Unsupported load value.
             raise AssemblySyntaxError(source_line, f"Invalid load value: '{value_text}'.")
@@ -435,9 +435,9 @@ def _parse_instruction(instruction: AssemblyInstruction) -> np.uint64:
             # Parse direction.
             match instruction_parts[3]:
                 case "left":
-                    return encode_instruction(Operation.SHIFT_LEFT, condition_register, condition, output_register, value, 1)
+                    return Instruction(Operation.SHIFT_LEFT, condition_register, condition, output_register, value, np.uint16(1))
                 case "right":
-                    return encode_instruction(Operation.SHIFT_RIGHT, condition_register, condition, output_register, value, 1)
+                    return Instruction(Operation.SHIFT_RIGHT, condition_register, condition, output_register, value, np.uint16(1))
                 case _:
                     raise AssemblySyntaxError(source_line, f"Invalid shift direction '{instruction_parts[3]}'.")
         
@@ -451,9 +451,9 @@ def _parse_instruction(instruction: AssemblyInstruction) -> np.uint64:
             # Parse direction.
             match instruction_parts[3]:
                 case "left":
-                    return encode_instruction(Operation.ROTATE_LEFT, condition_register, condition, output_register, value, 1)
+                    return Instruction(Operation.ROTATE_LEFT, condition_register, condition, output_register, value, np.uint16(1))
                 case "right":
-                    return encode_instruction(Operation.ROTATE_RIGHT, condition_register, condition, output_register, value, 1)
+                    return Instruction(Operation.ROTATE_RIGHT, condition_register, condition, output_register, value, np.uint16(1))
                 case _:
                     raise AssemblySyntaxError(source_line, f"Invalid rotation direction '{instruction_parts[3]}'.")
 
@@ -473,13 +473,13 @@ def _parse_instruction(instruction: AssemblyInstruction) -> np.uint64:
             bit_operation = instruction_parts[4]
             match bit_operation:
                 case "get":
-                    return encode_instruction(Operation.BIT_GET, condition_register, condition, output_register, value, bit)
+                    return Instruction(Operation.BIT_GET, condition_register, condition, output_register, value, bit)
                 case "set":
-                    return encode_instruction(Operation.BIT_SET, condition_register, condition, output_register, value, bit)
+                    return Instruction(Operation.BIT_SET, condition_register, condition, output_register, value, bit)
                 case "clear":
-                    return encode_instruction(Operation.BIT_CLEAR, condition_register, condition, output_register, value, bit)
+                    return Instruction(Operation.BIT_CLEAR, condition_register, condition, output_register, value, bit)
                 case "toggle":
-                    return encode_instruction(Operation.BIT_TOGGLE, condition_register, condition, output_register, value, bit)
+                    return Instruction(Operation.BIT_TOGGLE, condition_register, condition, output_register, value, bit)
                 case _:
                     raise AssemblySyntaxError(source_line, f"Invalid bit operation '{bit_operation}'.")
 
@@ -494,7 +494,7 @@ def _parse_instruction(instruction: AssemblyInstruction) -> np.uint64:
             operation = unary_operators[instruction_parts[2]]
 
             # Encode instruction.
-            return encode_instruction(operation, condition_register, condition, output_register, value, 0)
+            return Instruction(operation, condition_register, condition, output_register, value, np.uint16(0))
 
         # Binary operators
         if n_instruction_parts == 5 and instruction_parts[3] in binary_operations:
@@ -512,7 +512,7 @@ def _parse_instruction(instruction: AssemblyInstruction) -> np.uint64:
             operation = binary_operations[instruction_parts[3]]
 
             # Encode instruction.
-            return encode_instruction(operation, condition_register, condition, output_register, value_a, value_b)
+            return Instruction(operation, condition_register, condition, output_register, value_a, value_b)
 
         raise AssemblySyntaxError(source_line, "Invalid right hand side for assignment")
 
@@ -530,7 +530,7 @@ def _parse_instruction(instruction: AssemblyInstruction) -> np.uint64:
             raise AssemblySyntaxError(source_line, f"Invalid value: '{instruction_parts[2]}'.")
     
         # Encode instruction.
-        return encode_instruction(Operation.MEMORY_STORE, condition_register, Condition.NEVER, Register.R1, address, value)
+        return Instruction(Operation.MEMORY_STORE, condition_register, Condition.NEVER, Register.R1, address, value)
 
     # Stack push, 'push <value>'
     if n_instruction_parts == 2 and instruction_parts[0] == "push":
@@ -540,7 +540,7 @@ def _parse_instruction(instruction: AssemblyInstruction) -> np.uint64:
             raise AssemblySyntaxError(source_line, f"Invalid value: '{instruction_parts[1]}'.")
 
         # Encode instruction.
-        return encode_instruction(Operation.STACK_PUSH, condition_register, Condition.NEVER, Register.R1, value, 0)
+        return Instruction(Operation.STACK_PUSH, condition_register, Condition.NEVER, Register.R1, value, np.uint16(0))
 
     # Call, 'call <address>'
     if n_instruction_parts == 2 and instruction_parts[0] == "call":
@@ -550,7 +550,7 @@ def _parse_instruction(instruction: AssemblyInstruction) -> np.uint64:
             raise AssemblySyntaxError(source_line, f"Invalid value: '{instruction_parts[1]}'.")
 
         # Encode instruction.
-        return encode_instruction(Operation.STACK_CALL, condition_register, condition, Register.PC, Register.PC, value)
+        return Instruction(Operation.STACK_CALL, condition_register, condition, Register.PC, Register.PC, value)
 
     # IO WRITE, 'write <value>'
     if n_instruction_parts == 2 and instruction_parts[0] == "write":
@@ -560,7 +560,7 @@ def _parse_instruction(instruction: AssemblyInstruction) -> np.uint64:
             raise AssemblySyntaxError(source_line, f"Invalid value: '{instruction_parts[1]}'.")
 
         # Encode instruction.
-        return encode_instruction(Operation.IO_WRITE, condition_register, Condition.NEVER, Register.R1, value, 0)
+        return Instruction(Operation.IO_WRITE, condition_register, Condition.NEVER, Register.R1, value, np.uint16(0))
     
     # No instruction pattern detected, throw generic syntax exception.
     raise AssemblySyntaxError(source_line, f"Invalid instruction: '{instruction_text}'.")
@@ -591,7 +591,7 @@ def _prepare_instructions(
     include_directories: list[pathlib.Path],
     global_scope: AssemblyScope,
     included_units: set[str] | None = None,
-) -> list[AssemblyInstruction]:
+) -> list[AssemblyStatement]:
     # Early exit if program is empty.
     if len(src_lines) == 0:
         return []
@@ -602,22 +602,22 @@ def _prepare_instructions(
     included_units = included_units | { unit }
     
     # Create the initial source mapping.
-    instructions: list[AssemblyInstruction] = [ AssemblyInstruction(AssemblySourceLine(unit, line, text.strip()), _preformat_source_line(text), global_scope) for (line, text) in enumerate(src_lines) ]
+    statements: list[AssemblyStatement] = [ AssemblyStatement(AssemblySourceLine(unit, line, text.strip()), _preformat_source_line(text), global_scope) for (line, text) in enumerate(src_lines) ]
 
     # Remove empty lines.
     i_line = 0
-    while i_line < len(instructions):
-        if instructions[i_line].text == "":
+    while i_line < len(statements):
+        if statements[i_line].text == "":
             # Delete line, DON'T increment line counter.
-            del instructions[i_line]
+            del statements[i_line]
         else:
             # Increment line counter.
             i_line += 1
 
     # Handle includes.
     i_line = 0
-    while i_line < len(instructions):
-        line_text = instructions[i_line].text
+    while i_line < len(statements):
+        line_text = statements[i_line].text
         if not line_text.startswith("!include "):
             i_line += 1
             continue
@@ -626,7 +626,7 @@ def _prepare_instructions(
         include_parts = line_text.split(" ")
         n_include_parts = len(include_parts)
         if n_include_parts < 2:
-            raise AssemblySyntaxError(instructions[i_line].source, "Invalid include statement, missing input argument")
+            raise AssemblySyntaxError(statements[i_line].source, "Invalid include statement, missing input argument")
         
         # Include statement.
         include_target_id = include_parts[1]
@@ -639,14 +639,14 @@ def _prepare_instructions(
 
         # Raise exception if include target cannot be resolved.
         if include_file_path is None:
-            raise AssemblyIncludeError(instructions[i_line].source, include_target_id)
+            raise AssemblyIncludeError(statements[i_line].source, include_target_id)
         
         # Read include file
         try:
             with open(include_file_path, "r") as include_file:
                 include_src_lines = include_file.readlines()
         except Exception:
-            raise AssemblyIncludeError(instructions[i_line].source, include_target_id) 
+            raise AssemblyIncludeError(statements[i_line].source, include_target_id) 
 
         # Prepare include lines recursivly.
         include_instructions = _prepare_instructions(include_src_lines, str(include_file_path), include_directories, global_scope, included_units)
@@ -658,7 +658,7 @@ def _prepare_instructions(
             # Parse target scope name.
             include_scope_name = include_parts[2]
             if not include_scope_name.startswith("@"):
-                raise AssemblySyntaxError(instructions[i_line].source, f"Invalid scope name '{include_scope_name}' doesn't start with '@'.")
+                raise AssemblySyntaxError(statements[i_line].source, f"Invalid scope name '{include_scope_name}' doesn't start with '@'.")
 
             # Search for scope start. ('<label> {').
             while len(include_instructions) > 0:
@@ -666,7 +666,7 @@ def _prepare_instructions(
                     break
                 del include_instructions[0]
             else:
-                raise AssemblyError(instructions[i_line].source, f"No scope with the name '{include_scope_name}' found in unit '{str(include_file_path)}'.")
+                raise AssemblyError(statements[i_line].source, f"No scope with the name '{include_scope_name}' found in unit '{str(include_file_path)}'.")
 
             # Search for corresponding closing bracket.
             include_scope_length = 1
@@ -690,7 +690,7 @@ def _prepare_instructions(
                 # Increment length.
                 include_scope_length += 1
             else:
-                raise AssemblyError(instructions[i_line].source, f"Scope '{include_scope_name}' in unit '{str(include_file_path)}' is not closed.")
+                raise AssemblyError(statements[i_line].source, f"Scope '{include_scope_name}' in unit '{str(include_file_path)}' is not closed.")
 
             # Remove remaining include instructions.
             include_instructions = include_instructions[:include_scope_length]
@@ -698,12 +698,12 @@ def _prepare_instructions(
             # Check if scope alias is specified
             if n_include_parts > 3:
                 if n_include_parts != 5 or include_parts[3] != "as":
-                    raise AssemblySyntaxError(instructions[i_line].source, "Invalid include. Syntax is '!include <unit> @<scope> as @<alias>'.")
+                    raise AssemblySyntaxError(statements[i_line].source, "Invalid include. Syntax is '!include <unit> @<scope> as @<alias>'.")
 
                 # Parse alias scope name.
                 scope_alias_name = include_parts[4]
                 if not scope_alias_name.startswith("@"):
-                    raise AssemblySyntaxError(instructions[i_line].source, f"Invalid scope alias name '{scope_alias_name}' doesn't start with '@'.")
+                    raise AssemblySyntaxError(statements[i_line].source, f"Invalid scope alias name '{scope_alias_name}' doesn't start with '@'.")
 
                 # Replace scope name with alias.
                 for instruction in include_instructions:
@@ -718,12 +718,12 @@ def _prepare_instructions(
                     instruction.text = instruction.text[1:-1]
                                 
         # Replace include statement with included lines.
-        instructions = instructions[:i_line] + include_instructions + instructions[(i_line+1):]
+        statements = statements[:i_line] + include_instructions + statements[(i_line+1):]
 
         # Skip included lines as they have already been processed.
         i_line += len(include_instructions)
 
-    return instructions
+    return statements
 
 def assemble(
     src_lines: list[str],
@@ -741,105 +741,105 @@ def assemble(
 
     # Early exit if program is empty.
     if len(src_lines) == 0:
-        return AssembledProgram(np.zeros(1, dtype=np.uint64), [], [], global_scope)
+        return AssembledProgram([], [], [], global_scope)
 
     # Prepare the source lines.
     # This handles things like comments, whitespace simplifcation and lowercase transforamtion, 
     # as well as the !include statement.
-    instructions = _prepare_instructions(src_lines, str(unit), include_directories, global_scope)
+    statements = _prepare_instructions(src_lines, str(unit), include_directories, global_scope)
     
     # Insert initialization jump.
-    instructions.insert(0, AssemblyInstruction(AssemblySourceLine(GENERATED_UNIT_NAME, 0, f"jump @{START_LABEL_NAME}"), f"jump @{START_LABEL_NAME}", global_scope))
+    statements.insert(0, AssemblyStatement(AssemblySourceLine(GENERATED_UNIT_NAME, 0, f"jump @{START_LABEL_NAME}"), f"jump @{START_LABEL_NAME}", global_scope))
 
     # Preprocessor
     # Handles labels, macros
     next_scope_id: int = 1
     current_scope = global_scope
-    i_instruction = 0
-    while i_instruction < len(instructions):
-        instruction = instructions[i_instruction]
+    i_statement = 0
+    while i_statement < len(statements):
+        statement = statements[i_statement]
 
         # Update instruction scope.
-        instruction.scope = current_scope
+        statement.scope = current_scope
         
         # Handle scopes.
-        if instruction.text == "{":
+        if statement.text == "{":
             # Create new child scope.
-            scope = AssemblyScope(next_scope_id, f"__unnamed_scope_{next_scope_id}__", current_scope, [], i_instruction, -1, {}, {})
+            scope = AssemblyScope(next_scope_id, f"__unnamed_scope_{next_scope_id}__", current_scope, [], i_statement, -1, {}, {})
             current_scope.children.append(scope)
             current_scope = scope
             next_scope_id += 1
 
             # Delete original instruction line, DON'T increment line counter.
-            del instructions[i_instruction]
+            del statements[i_statement]
             continue
 
-        if instruction.text == "}":
+        if statement.text == "}":
             # Check if there is a parent scope.
             parent_scope = current_scope.parent
             if parent_scope is None:
-                raise AssemblyError(instruction.source, "Can't close the global scope.")
+                raise AssemblyError(statement.source, "Can't close the global scope.")
             
             # Close scope.
-            current_scope.end = i_instruction
+            current_scope.end = i_statement
             current_scope = parent_scope
 
-            # Delete original instruction line, DON'T increment line counter.
-            del instructions[i_instruction]
+            # Delete original statement line, DON'T increment line counter.
+            del statements[i_statement]
             continue
 
         # Handle labels.
-        if instruction.text.startswith("@"):
+        if statement.text.startswith("@"):
             # Parse label.
-            label_parts = instruction.text[1:].split(" ", maxsplit=1)
+            label_parts = statement.text[1:].split(" ", maxsplit=1)
             n_label_parts = len(label_parts)
             create_scope = False
             match n_label_parts:
                 case 0:
-                    raise AssemblySyntaxError(instruction.source, f"Invalid label '{instruction.text}'.")
+                    raise AssemblySyntaxError(statement.source, f"Invalid label '{statement.text}'.")
                 case 1:
                     label_name = label_parts[0]
                 case 2:
                     label_name = label_parts[0]
                     if label_parts[1] != "{":
-                        raise AssemblySyntaxError(instruction.source, f"Invalid label '{instruction.text}'.")
+                        raise AssemblySyntaxError(statement.source, f"Invalid label '{statement.text}'.")
                     create_scope = True
                 case _:
-                    raise AssemblySyntaxError(instruction.source, f"Invalid label '{instruction.text}'.")
+                    raise AssemblySyntaxError(statement.source, f"Invalid label '{statement.text}'.")
                 
             # Create label.
-            label = current_scope.create_label(label_name, i_instruction, instruction.source)
+            label = current_scope.create_label(label_name, i_statement, statement.source)
 
             # Create scope if specified.
             if create_scope:
                 # Create new child scope.
-                scope = AssemblyScope(next_scope_id, label.name, current_scope, [], i_instruction, -1, {}, {})
+                scope = AssemblyScope(next_scope_id, label.name, current_scope, [], i_statement, -1, {}, {})
                 current_scope.children.append(scope)
                 current_scope = scope
                 next_scope_id += 1
 
-            # Delete original instruction line, DON'T increment line counter.
-            del instructions[i_instruction]
+            # Delete original statement line, DON'T increment line counter.
+            del statements[i_statement]
             continue
 
         # Handle macros.
-        if instruction.text.startswith("!define"):
+        if statement.text.startswith("!define"):
             # Parse macro.
-            define_parts = instruction.text.split(" ", 2)
+            define_parts = statement.text.split(" ", 2)
             if len(define_parts) < 3:
-                raise AssemblySyntaxError(instruction.source, "Invalid macro definition. Syntax is '!define <name> <value>'.")
+                raise AssemblySyntaxError(statement.source, "Invalid macro definition. Syntax is '!define <name> <value>'.")
             macro_name = define_parts[1]
             macro_value = " ".join(define_parts[2:])
 
             # Create macro.
-            current_scope.create_macro(macro_name, macro_value, instruction.source)
+            current_scope.create_macro(macro_name, macro_value, statement.source)
 
-            # Delete original instruction line, DON'T increment line counter.
-            del instructions[i_instruction]
+            # Delete original statement line, DON'T increment line counter.
+            del statements[i_statement]
             continue
 
         # Increment line counter.
-        i_instruction += 1
+        i_statement += 1
 
     # Make sure that the start label is defined.
     if global_scope.find_label(START_LABEL_NAME) is None:
@@ -848,12 +848,12 @@ def assemble(
         global_scope.create_label(START_LABEL_NAME, 1, None)
 
     # Count instructions. The number of instruction doesn't change after this point.
-    n_instructions = len(instructions)
+    n_instructions = len(statements)
 
     # Apply macros.
-    for instruction in instructions:
+    for statement in statements:
         # Add whitespace to fix word replace at line start / end
-        instruction.text = f" {instruction.text} "
+        statement.text = f" {statement.text} "
 
         # Apply macros.
         # Because the value of a macro could be the key of another macro, all macros are applied repeatedly,
@@ -861,51 +861,51 @@ def assemble(
         # To check for cyclic dependencies, previous_instruction_states keeps track of 
         # all previously seen states of this line.
         previous_instruction_states: set[str] = set()
-        while instruction.text not in previous_instruction_states:
-            previous_instruction_states.add(instruction.text)
+        while statement.text not in previous_instruction_states:
+            previous_instruction_states.add(statement.text)
 
             # Apply all macros and count the numbe
             unchanged = True
-            for macro in instruction.scope.visible_macros().values():
-                if f" {macro.name} " in instruction.text:
-                    instruction.text = instruction.text.replace(f" {macro.name} ", f" {macro.value} ")
+            for macro in statement.scope.visible_macros().values():
+                if f" {macro.name} " in statement.text:
+                    statement.text = statement.text.replace(f" {macro.name} ", f" {macro.value} ")
                     unchanged = False
-                if f"[{macro.name}]" in instruction.text:
-                    instruction.text = instruction.text.replace(f"[{macro.name}]", f"[{macro.value}]")
+                if f"[{macro.name}]" in statement.text:
+                    statement.text = statement.text.replace(f"[{macro.name}]", f"[{macro.value}]")
                     unchanged = False
 
             # Break if line remained unchanged.
             if unchanged:
                 break
         else:
-            raise AssemblyError(instruction.source, "Cyclic macro definition.")
+            raise AssemblyError(statement.source, "Cyclic macro definition.")
 
         # Check for unresolved macros.
-        if " $" in instruction.text:
-            i_macro_start = instruction.text.index(" $") + 1
-            if " " in instruction.text[i_macro_start:]:
-                i_macro_end = instruction.text[i_macro_start:].index(" ")
-                macro_id = instruction.text[i_macro_start:(i_macro_end + i_macro_start)]
+        if " $" in statement.text:
+            i_macro_start = statement.text.index(" $") + 1
+            if " " in statement.text[i_macro_start:]:
+                i_macro_end = statement.text[i_macro_start:].index(" ")
+                macro_id = statement.text[i_macro_start:(i_macro_end + i_macro_start)]
             else:
-                macro_id = instruction.text[i_macro_start]
-            raise AssemblyError(instruction.source, f"Unable to resolve macro '{macro_id}'.")
+                macro_id = statement.text[i_macro_start]
+            raise AssemblyError(statement.source, f"Unable to resolve macro '{macro_id}'.")
         
-        if "[$" in instruction.text:
-            i_macro_start = instruction.text.index("[$") + 1
-            if "]" in instruction.text[i_macro_start:]:
-                i_macro_end = instruction.text[i_macro_start:].index(" ")
-                macro_id = instruction.text[i_macro_start:(i_macro_end + i_macro_start)]
+        if "[$" in statement.text:
+            i_macro_start = statement.text.index("[$") + 1
+            if "]" in statement.text[i_macro_start:]:
+                i_macro_end = statement.text[i_macro_start:].index(" ")
+                macro_id = statement.text[i_macro_start:(i_macro_end + i_macro_start)]
             else:
-                macro_id = instruction.text[i_macro_start]
-            raise AssemblyError(instruction.source, f"Unable to resolve macro '{macro_id}'.")
+                macro_id = statement.text[i_macro_start]
+            raise AssemblyError(statement.source, f"Unable to resolve macro '{macro_id}'.")
         
         # Remove previously added whitespace.
-        instruction.text = instruction.text[1:-1]
+        statement.text = statement.text[1:-1]
 
     # Transform repeat / exit statements into jumps.
-    for instruction in instructions:
+    for statement in statements:
         # Check if instruction is a repeat.
-        instruction_parts = instruction.text.split(" ")
+        instruction_parts = statement.text.split(" ")
         n_instruction_parts = len(instruction_parts)
         if n_instruction_parts < 1 or (instruction_parts[0] not in ["repeat", "exit"]):
             continue
@@ -913,7 +913,7 @@ def assemble(
         i_remaining_parts = 1
 
         # Check if label is specified
-        scope = instruction.scope
+        scope = statement.scope
         if n_instruction_parts > 1 and instruction_parts[1].startswith("@"):
             target_scope_name = instruction_parts[1][1:] # Skip '@' symbol.
             i_remaining_parts = 2
@@ -925,98 +925,98 @@ def assemble(
                 scope = scope.parent
             else:
                 # This is only executed if the loop exited "naturally", which means the scope was not found.
-                raise AssemblySyntaxError(instruction.source, f"Unknown parent scope '@{target_scope_name}'")
+                raise AssemblySyntaxError(statement.source, f"Unknown parent scope '@{target_scope_name}'")
         
         remaining_part = " ".join(instruction_parts[i_remaining_parts:])
 
         match instruction_parts[0]:
             case "repeat":
-                instruction.text = f"jump {scope.start} {remaining_part}".strip()
+                statement.text = f"jump {scope.start} {remaining_part}".strip()
             case "exit":
-                instruction.text = f"jump {scope.end} {remaining_part}".strip()
+                statement.text = f"jump {scope.end} {remaining_part}".strip()
             case _:
-                raise AssemblyError(instruction.source, f"Invalid scope statement '{instruction_parts[0]}'")
+                raise AssemblyError(statement.source, f"Invalid scope statement '{instruction_parts[0]}'")
 
     # Apply labels
-    for instruction in instructions:
+    for statement in statements:
         # Add whitespace to fix word replace at line start / end
-        instruction.text = f" {instruction.text} "
+        statement.text = f" {statement.text} "
 
         # Apply labels.
-        for label in instruction.scope.visible_labels().values():
-            instruction.text = instruction.text.replace(f" @{label.name} ", f" {label.location} ")
-            instruction.text = instruction.text.replace(f"[@{label.name}]", f"[{label.location}]")
+        for label in statement.scope.visible_labels().values():
+            statement.text = statement.text.replace(f" @{label.name} ", f" {label.location} ")
+            statement.text = statement.text.replace(f"[@{label.name}]", f"[{label.location}]")
 
         # Check for unresolved labels.
-        if " @" in instruction.text:
-            i_label_start = instruction.text.index(" @") + 1
-            if " " in instruction.text[i_label_start:]:
-                i_label_end = instruction.text[i_label_start:].index(" ")
-                label_id = instruction.text[i_label_start:(i_label_end + i_label_start)]
+        if " @" in statement.text:
+            i_label_start = statement.text.index(" @") + 1
+            if " " in statement.text[i_label_start:]:
+                i_label_end = statement.text[i_label_start:].index(" ")
+                label_id = statement.text[i_label_start:(i_label_end + i_label_start)]
             else:
-                label_id = instruction.text[i_label_start]
-            raise AssemblyError(instruction.source, f"Unable to resolve label '{label_id}'.")
+                label_id = statement.text[i_label_start]
+            raise AssemblyError(statement.source, f"Unable to resolve label '{label_id}'.")
 
-        if "[@" in instruction.text:
-            i_label_start = instruction.text.index("[@") + 1
-            if " " in instruction.text[i_label_start:]:
-                i_label_end = instruction.text[i_label_start:].index(" ")
-                label_id = instruction.text[i_label_start:(i_label_end + i_label_start)]
+        if "[@" in statement.text:
+            i_label_start = statement.text.index("[@") + 1
+            if " " in statement.text[i_label_start:]:
+                i_label_end = statement.text[i_label_start:].index(" ")
+                label_id = statement.text[i_label_start:(i_label_end + i_label_start)]
             else:
-                label_id = instruction.text[i_label_start]
-            raise AssemblyError(instruction.source, f"Unable to resolve label '{label_id}'.")
+                label_id = statement.text[i_label_start]
+            raise AssemblyError(statement.source, f"Unable to resolve label '{label_id}'.")
             
         # Remove previously added whitespace.
-        instruction.text = instruction.text[1:-1]
+        statement.text = statement.text[1:-1]
 
     # Convert every standalone if condition that is followed by a new scope to a condition skip, that skips that scope.
     # Note that the condition must be inverted for that.
-    for (i_instruction, instruction) in enumerate(instructions):
-        instruction = instructions[i_instruction]
+    for (i_statement, statement) in enumerate(statements):
+        statement = statements[i_statement]
         # Check if instruction is a standalone if condition.
-        if not instruction.text.startswith("if"):
+        if not statement.text.startswith("if"):
             continue
 
         # Check that condition has a target scope.
-        if i_instruction == n_instructions - 1:
-            raise AssemblySyntaxError(instruction.source, "Condition without target scope")
+        if i_statement == n_instructions - 1:
+            raise AssemblySyntaxError(statement.source, "Condition without target scope")
 
-        next_instruction = instructions[i_instruction + 1]
-        if next_instruction.scope.id == instruction.scope.id:
+        next_instruction = statements[i_statement + 1]
+        if next_instruction.scope.id == statement.scope.id:
             # Next instrution is in the same scope, skip only one instruction (+1 to skip the condition itself).
             # The condition is inverted by appending a "not".
-            instruction.text = f"skip 2 {instruction.text} not"
+            statement.text = f"skip 2 {statement.text} not"
             continue
 
         # Find the scope that should be skipped.
         # This would be the scope, whoes parent scope is the scope of the if.
         scope = next_instruction.scope
         while scope is not None:
-            if scope.parent is not None and scope.parent.id == instruction.scope.id:
+            if scope.parent is not None and scope.parent.id == statement.scope.id:
                 break
             scope = scope.parent
         else:
             # This is only executed if the loop exited "naturally", which means the scope was not found.
-            raise AssemblySyntaxError(instruction.source, "Standalone condition must be placed before a scope")
+            raise AssemblySyntaxError(statement.source, "Standalone condition must be placed before a scope")
         
         # Skip the length of the following scope (+1 to skip the condition iftself).
         # The condition is inverted by appending a "not".
-        instruction.text = f"skip {scope.end - scope.start + 1} {instruction.text} not"
+        statement.text = f"skip {scope.end - scope.start + 1} {statement.text} not"
         continue
 
     # Assemble instructions.
-    encoded_instructions = np.zeros(n_instructions, dtype=np.uint64)
-    for i_instruction, instruction in enumerate(instructions):
+    instructions: list[Instruction] = []
+    for i_statement, statement in enumerate(statements):
         try:
             # Parse the instruction.
-            encoded_instructions[i_instruction] = _parse_instruction(instruction)
+            instructions.append(_parse_instruction(statement))
         except AssemblySyntaxError:
             raise
         except Exception as exception:
-            raise Exception(f"Exception whilst parsing line {instruction.source.line + 1} of unit '{instruction.source.unit}': '{instruction.source.text}'.") from exception
+            raise Exception(f"Exception whilst parsing line {statement.source.line + 1} of unit '{statement.source.unit}': '{statement.source.text}'.") from exception
 
     # Return generated program.
-    return AssembledProgram(encoded_instructions, src_lines, instructions, global_scope)
+    return AssembledProgram(instructions, statements, src_lines, global_scope)
 
 # endregion assembler
 
@@ -1081,24 +1081,26 @@ if __name__ == "__main__":
         print("Failed to assemble program.", file=sys.stderr)
         exit(1)
 
+    program_binary = encode_program(program.instructions)
+
     # Write the output to a file.
     if not check_mode:
         with open(output_filepath, "wb") as output_file:
-            output_file.write(program.binary.tobytes())
+            output_file.write(program_binary.tobytes())
 
     # Output preprocessed assembly if flag is enabled. 
     if output_preprocessed:
         mappings_path = output_filepath.parent / f"{output_filepath.stem}.pre.mcasm"
         with open(mappings_path, "w") as mappings_file:
-            max_instruction_line_length = np.max([len(line.text) for line in program.instructions])
+            max_instruction_line_length = np.max([len(line.text) for line in program.statements])
 
-            for instruction in program.instructions:
+            for instruction in program.statements:
                 if instruction.source.unit == GENERATED_UNIT_NAME:
                     mappings_file.write(f"{instruction.text.ljust(max_instruction_line_length + 3)} # generated\n")
                 else:
                     mappings_file.write(f"{instruction.text.ljust(max_instruction_line_length + 3)} # line {instruction.source.line + 1:5d} of unit \"{instruction.source.unit}\"\n")
 
     # Summary output.
-    print(f"Assembled {len(program.instructions)} instructions")
+    print(f"Assembled {len(program.statements)} instructions")
 
 # endregion application
