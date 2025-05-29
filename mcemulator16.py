@@ -233,7 +233,7 @@ if __name__ == "__main__":
 
     # Read input lines
     input_filepath = pathlib.Path(input_filename)
-    if input_filepath.suffix == ".mcasm":
+    if input_filepath.suffix == ".mcasm" or input_filepath.suffix == ".axm":
         # Program is assembled source code.
         with open(input_filepath, "r") as input_file:
             src_lines = [line.strip() for line in input_file.readlines()]
